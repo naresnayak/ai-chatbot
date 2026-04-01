@@ -1,0 +1,40 @@
+services:
+  web:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app  # This links your 'ai-chatbot' folder to the container's '/app' folder
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongo
+      - redis
+    networks:
+    - chatbot_network
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo_db
+    
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+    - chatbot_network
+
+  redis:
+    image: redis:alpine
+    networks:
+    - chatbot_network
+
+
+networks:
+  chatbot_network:
+    driver: bridge
+    
+volumes:
+  mongo_data:
