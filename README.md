@@ -70,6 +70,53 @@ graph LR
     G --> H[Async Save to MongoDB]
 ```
 
+
+### ⚙️  Technical Workflow
+
+This section explains the internal lifecycle of a request within the **Bite Byte** system, from the initial API call to the final streamed response.
+
+The following sequence diagram illustrates how the `FastAPI` router coordinates between the `ChatManager` (Data) and the `GeminiService` (AI).
+
+```mermaid
+sequenceDiagram
+    participant U as User (Frontend)
+    participant API as FastAPI Router
+    participant CM as ChatManager
+    participant R as Redis (L1 Cache)
+    participant M as MongoDB (L2 Disk)
+    participant GS as GeminiService
+    participant AI as Gemini 2.0 API
+
+    U->>API: POST /chat/stream {message, session_id}
+    
+    Note over API, CM: Step 1: Context Retrieval
+    API->>CM: get_history(session_id)
+    CM->>R: GET chat:session_id
+    
+    alt Cache Hit
+        R-->>CM: Return JSON History
+    else Cache Miss
+        CM->>M: find({session_id}).sort(timestamp)
+        M-->>CM: Return List[Dict]
+        CM->>R: SETEX (Re-populate Cache)
+    end
+    CM-->>API: Return Formatted History
+
+    Note over API, GS: Step 2: AI Generation
+    API->>GS: stream_response(history, message)
+    GS->>AI: send_message_stream(user_input)
+    
+    loop Streaming Chunks
+        AI-->>GS: Token Chunks
+        GS-->>U: SSE (Server-Sent Events)
+    end
+    
+    Note over CM: Step 3: Background Persistence
+    par Background Tasks
+        CM->>M: insert_one(new_msg)
+        CM->>R: Update Active Window (Last 5)
+    end
+```
 ## 📜 System Rules (The "Bite Byte" Personality)
 To keep the assistant focused and efficient, the following rules are enforced:
 
