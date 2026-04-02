@@ -71,7 +71,7 @@ graph LR
 ```
 
 
-### ⚙️  Technical Workflow
+### 🧠  Technical Workflow
 
 This section explains the internal lifecycle of a request within the **Bite Byte** system, from the initial API call to the final streamed response.
 
