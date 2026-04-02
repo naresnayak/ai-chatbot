@@ -165,7 +165,14 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message, session_id: sessionId })
                 });
-
+                
+                 // Capture the session ID if it's new
+                const serverSessionId = response.headers.get('X-Session-ID');
+                if (serverSessionId && !sessionId) {
+                    sessionId = serverSessionId;
+                    localStorage.setItem('chat_session_id', sessionId); // Now it's saved for refresh!
+                }
+                
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 
@@ -185,11 +192,43 @@
                     botDiv.innerHTML = marked.parse(fullMarkdownText);
                     chatWindow.scrollTop = chatWindow.scrollHeight;
                 }
+
             } catch (error) {
                 if (loader) loader.remove();
                 botDiv.innerText = "Connection lost. Please check your internet.";
             }
+
+           
         });
+
+
+        async function loadHistory() {
+            if (!sessionId) return; // Don't fetch if it's a brand new user
+
+            try {
+                const response = await fetch(`chat/history/${sessionId}`);
+                if (!response.ok) return;
+                
+                const history = await response.json();
+                
+                // Loop through the history and append to the chat window
+                history.forEach(msg => {
+                    const botDiv = appendMessage(msg.role === 'user' ? 'user' : 'bot');
+                    
+                    if (msg.role === 'model' || msg.role === 'assistant') {
+                        // Use marked to render the saved markdown correctly
+                        botDiv.innerHTML = marked.parse(msg.content);
+                    } else {
+                        botDiv.innerText = msg.content;
+                    }
+                });
+            } catch (err) {
+                console.error("Could not load chat history:", err);
+            }
+     }
+    
+     // Trigger history load as soon as the DOM is ready
+    window.addEventListener('DOMContentLoaded', loadHistory);
     </script>
 </body>
 </html>
